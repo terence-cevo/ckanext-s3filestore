@@ -7,6 +7,7 @@ import mimetypes
 import magic
 
 import boto3
+from boto3.s3.transfer import TransferConfig
 import botocore
 from botocore.client import Config as BotoConfig
 from botocore.exceptions import ClientError
@@ -128,12 +129,22 @@ class BaseS3Uploader(object):
         upload_file.seek(0)
 
         s3 = self.get_s3_resource()
-
+        config = TransferConfig(multipart_threshold=1024 * 25,
+                                max_concurrency= 10,
+                                multipart_chunksize= 1024 * 25,
+                                use_threads= True)
         try:
-            s3.Object(self.bucket_name, filepath).put(
-                Body=upload_file.read(),
-                ACL='public-read' if make_public else self.acl,
-                ContentType=getattr(self, 'mimetype', '') or 'text/plain')
+            s3.Object(self.bucket_name, filepath).\
+                upload_file(upload_file.read(),
+                              ExtraArgs={
+                                  'ACL':'public-read' if make_public else self.acl,
+                                  'ContentType': getattr(self, 'mimetype', '') or 'text/plain'
+                              },
+                              Config=config)
+            # s3.Object(self.bucket_name, filepath).put(
+            #     Body=upload_file.read(),
+            #     ACL='public-read' if make_public else self.acl,
+            #     ContentType=getattr(self, 'mimetype', '') or 'text/plain')
             log.info("Successfully uploaded {0} to S3!".format(filepath))
         except Exception as e:
             log.error('Something went very very wrong for {0}'.format(str(e)))
