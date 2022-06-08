@@ -13,6 +13,7 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IUploader)
     plugins.implements(plugins.IBlueprint)
     plugins.implements(plugins.IClick)
+    plugins.implements(plugins.IResourceController, inherit=True)
 
     # IConfigurer
 
@@ -72,3 +73,28 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
 
     def get_commands(self):
         return [upload_resources]
+
+    # IResourceController
+
+    def before_delete(self, context, resource, resources):
+        # let's get all info about our resource. It somewhere in resources
+        # but if there is some possibility that it isn't(magic?) we have
+        # `else` clause
+        for res in resources:
+            if res["id"] == resource["id"]:
+                break
+        else:
+            return
+        # just ignore simple links
+        if res["url_type"] != "upload":
+            return
+
+        # we don't want to change original item from resources, just in case
+        # someone will use it in another `before_delete`. So, let's copy it
+        # and add `clear_upload` flag
+        res_dict = dict(list(res.items()) + [("clear_upload", True)])
+
+        uploader = self.get_resource_uploader(res_dict)
+
+        # and now uploader removes our file.
+        uploader.upload(resource["id"])
