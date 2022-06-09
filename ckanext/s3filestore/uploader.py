@@ -185,6 +185,10 @@ class BaseS3Uploader(object):
 
         return url
 
+    def get_file_size(self, filepath):
+        s3 = self.get_s3_resource();
+        return s3.Object(self.bucket_name, filepath).content_length
+
 
 class S3Uploader(BaseS3Uploader):
     '''
@@ -401,3 +405,7 @@ class S3ResourceUploader(BaseS3Uploader):
             log.warning('Key {0} not found in bucket {1} for delete'
                         .format(key_path, self.bucket_name))
             pass
+
+    def find_file_size(self, filename):
+        return self.get_file_size(filepath=filename)
+
