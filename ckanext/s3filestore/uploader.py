@@ -8,6 +8,7 @@ import magic
 
 import boto3
 import botocore
+from boto3.s3.transfer import TransferConfig
 from botocore.client import Config as BotoConfig
 from botocore.exceptions import ClientError
 import ckantoolkit as toolkit
@@ -70,7 +71,7 @@ class BaseS3Uploader(object):
 
     def get_s3_resource(self):
         return \
-            self.get_s3_session()\
+            self.get_s3_session() \
                 .resource('s3',
                           endpoint_url=self.host_name,
                           config=BotoConfig(
@@ -79,7 +80,7 @@ class BaseS3Uploader(object):
 
     def get_s3_client(self):
         return \
-            self.get_s3_session()\
+            self.get_s3_session() \
                 .client('s3',
                         endpoint_url=self.host_name,
                         config=BotoConfig(
@@ -88,7 +89,7 @@ class BaseS3Uploader(object):
                         region_name=self.region)
 
     def get_s3_bucket(self, bucket_name):
-        '''Return a boto bucket, creating it if it doesn't exist.'''
+        """Return a boto bucket, creating it if it doesn't exist."""
 
         # make s3 connection using boto3
         s3 = self.get_s3_resource()
@@ -123,24 +124,30 @@ class BaseS3Uploader(object):
         return bucket
 
     def upload_to_key(self, filepath, upload_file, make_public=False):
-        '''Uploads the `upload_file` to `filepath` on `self.bucket`.'''
+        """Uploads the `upload_file` to `filepath` on `self.bucket`."""
 
         upload_file.seek(0)
 
         s3 = self.get_s3_resource()
-
+        transfer_config = TransferConfig(multipart_threshold=1024 * 25,
+                                         max_concurrency=10,
+                                         multipart_chunksize=1024 * 25,
+                                         use_threads=True)
         try:
-            s3.Object(self.bucket_name, filepath).put(
-                Body=upload_file.read(),
-                ACL='public-read' if make_public else self.acl,
-                ContentType=getattr(self, 'mimetype', '') or 'text/plain')
+            s3.Object(self.bucket_name, filepath). \
+                upload_fileobj(upload_file,
+                               ExtraArgs={
+                                   'ACL': 'public-read' if make_public else self.acl,
+                                   'ContentType': getattr(self, 'mimetype', '') or 'text/plain'
+                               },
+                               Config=transfer_config)
             log.info("Successfully uploaded {0} to S3!".format(filepath))
         except Exception as e:
             log.error('Something went very very wrong for {0}'.format(str(e)))
             raise e
 
     def clear_key(self, filepath):
-        '''Deletes the contents of the key at `filepath` on `self.bucket`.'''
+        """Deletes the contents of the key at `filepath` on `self.bucket`."""
 
         s3 = self.get_s3_resource()
 
@@ -150,7 +157,7 @@ class BaseS3Uploader(object):
             raise e
 
     def get_signed_url_to_key(self, key, extra_params={}):
-        '''Generates a pre-signed URL giving access to an S3 object.
+        """Generates a pre-signed URL giving access to an S3 object.
 
         If a download_proxy is configured, then the URL will be
         generated using the true S3 host, and then the hostname will be
@@ -159,7 +166,7 @@ class BaseS3Uploader(object):
         will fail signature verification; the download_proxy server must
         be configured to set the Host header back to the true value when
         forwarding the request (CloudFront does this automatically).
-        '''
+        """
         client = self.get_s3_client()
         # check whether the object exists in S3
         client.head_object(Bucket=self.bucket_name, Key=key)
@@ -178,20 +185,24 @@ class BaseS3Uploader(object):
 
         return url
 
+    def get_file_size(self, filepath):
+        s3 = self.get_s3_resource();
+        return s3.Object(self.bucket_name, filepath).content_length
+
 
 class S3Uploader(BaseS3Uploader):
-    '''
+    """
     An uploader class to replace local file storage with Amazon Web Services
     S3 for general files (e.g. Group cover images).
-    '''
+    """
 
     def __init__(self, upload_to, old_filename=None):
-        '''Setup the uploader. Additional setup is performed by
+        """Setup the uploader. Additional setup is performed by
         update_data_dict(), and actual uploading performed by `upload()`.
 
         Create a storage path in the format:
         <ckanext.s3filestore.aws_storage_path>/storage/uploads/<upload_to>/
-        '''
+        """
 
         super(S3Uploader, self).__init__()
 
@@ -210,7 +221,7 @@ class S3Uploader(BaseS3Uploader):
         return os.path.join(path, 'storage', 'uploads', upload_to)
 
     def update_data_dict(self, data_dict, url_field, file_field, clear_field):
-        '''Manipulate data from the data_dict. This needs
+        """Manipulate data from the data_dict. This needs
         to be called before it
         reaches any validators.
 
@@ -221,7 +232,7 @@ class S3Uploader(BaseS3Uploader):
 
         `clear_field` is the name of a boolean field which requests the upload
         to be deleted.
-        '''
+        """
 
         self.url = data_dict.get(url_field, '')
         self.clear = data_dict.pop(clear_field, None)
@@ -247,12 +258,12 @@ class S3Uploader(BaseS3Uploader):
                 data_dict[url_field] = ''
 
     def upload(self, max_size=2):
-        '''Actually upload the file.
+        """Actually upload the file.
 
         This should happen just before a commit but after the data has been
         validated and flushed to the db. This is so we do not store anything
         unless the request is actually good. max_size is size in MB maximum of
-        the file'''
+        the file"""
 
         # If a filename has been provided (a file is being uploaded) write the
         # file to the appropriate key in the AWS bucket.
@@ -265,7 +276,7 @@ class S3Uploader(BaseS3Uploader):
             self.clear_key(self.old_filepath)
 
     def delete(self, filename):
-        ''' Delete file we are pointing at'''
+        """ Delete file we are pointing at"""
         filename = munge.munge_filename_legacy(filename)
         key_path = os.path.join(self.storage_path, filename)
         try:
@@ -277,18 +288,18 @@ class S3Uploader(BaseS3Uploader):
 
 
 class S3ResourceUploader(BaseS3Uploader):
-    '''
+    """
     An uploader class to replace local file storage with Amazon Web Services
     S3 for resource files.
-    '''
+    """
 
     def __init__(self, resource):
-        '''Setup the resource uploader. Actual uploading performed by
+        """Setup the resource uploader. Actual uploading performed by
         `upload()`.
 
         Create a storage path in the format:
         <ckanext.s3filestore.aws_storage_path>/resources/
-        '''
+        """
 
         super(S3ResourceUploader, self).__init__()
 
@@ -354,20 +365,20 @@ class S3ResourceUploader(BaseS3Uploader):
             resource['url_type'] = ''
 
     def get_path(self, id, filename):
-        '''Return the key used for this resource in S3.
+        """Return the key used for this resource in S3.
 
         Keys are in the form:
         <ckanext.s3filestore.aws_storage_path>/resources/<resourceid>/<filename>
 
         e.g.:
         my_storage_path/resources/165900ba-3c60-43c5-9e9c-9f8acd0aa93f/data.csv
-        '''
+        """
         directory = self.get_directory(id, self.storage_path)
         filepath = os.path.join(directory, filename)
         return filepath
 
     def upload(self, id, max_size=10):
-        '''Upload the file to S3.'''
+        """Upload the file to S3."""
 
         # If a filename has been provided (a file is being uploaded) write the
         # file to the appropriate key in the AWS bucket.
@@ -385,7 +396,7 @@ class S3ResourceUploader(BaseS3Uploader):
             self.clear_key(filepath)
 
     def delete(self, id, filename=None):
-        ''' Delete file we are pointing at'''
+        """ Delete file we are pointing at"""
 
         if filename is None:
             filename = os.path.basename(self.url)
@@ -397,3 +408,6 @@ class S3ResourceUploader(BaseS3Uploader):
             log.warning('Key {0} not found in bucket {1} for delete'
                         .format(key_path, self.bucket_name))
             pass
+
+    def find_file_size(self, filename):
+        return self.get_file_size(filepath=filename)

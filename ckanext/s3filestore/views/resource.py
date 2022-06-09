@@ -69,11 +69,17 @@ def resource_download(package_type, id, resource_id, filename=None):
             if preview:
                 url = upload.get_signed_url_to_key(key_path)
             else:
-                params = {
-                    'ResponseContentDisposition':
-                        'attachment; filename=' + filename,
-                }
-                url = upload.get_signed_url_to_key(key_path, params)
+                file_size = upload.find_file_size(filename=key_path)
+                # If a file size is greater than 10MB it should then automatically download the file
+                if file_size >= 10485760:
+                    params = {
+                        'ResponseContentDisposition':
+                            'attachment; filename=' + filename,
+                    }
+                    url = upload.get_signed_url_to_key(key_path, params)
+                else:
+                    url = upload.get_signed_url_to_key(key_path)
+
             return redirect(url)
 
         except ClientError as ex:
