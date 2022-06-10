@@ -1,12 +1,15 @@
 
 import os
 import click
+from boto3.s3.transfer import TransferConfig
 
 from sqlalchemy import create_engine
 from sqlalchemy.sql import text
 from ckantoolkit import config
 from ckanext.s3filestore.uploader import BaseS3Uploader
-
+import magic
+import sys
+import threading
 
 @click.command(u's3-upload',
                short_help=u'Uploads all resources '
@@ -20,7 +23,7 @@ def upload_resources():
     bucket_name = config.get('ckanext.s3filestore.aws_bucket_name')
     acl = config.get('ckanext.s3filestore.acl', 'public-read')
     resource_ids_and_paths = {}
-
+    mime = magic.Magic(mime=True)
     for root, dirs, files in os.walk(storage_path):
         if files:
             resource_id = root.split('/')[-2] + root.split('/')[-1] + files[0]
@@ -60,15 +63,31 @@ def upload_resources():
 
     uploader = BaseS3Uploader()
     s3_connection = uploader.get_s3_resource()
+    click.secho('Using the new transfer config parameters')
+    transfer_config = TransferConfig(multipart_threshold=1024 * 25,
+                                     max_concurrency=10,
+                                     multipart_chunksize=1024 * 25,
+                                     use_threads=True)
 
     uploaded_resources = []
     for resource_id, file_name in resource_ids_and_names.items():
+        total = 0
+        uploaded = 0
         key = 'resources/{resource_id}/{file_name}'.format(
             resource_id=resource_id, file_name=file_name)
-        s3_connection.Object(bucket_name, key)\
-            .put(Body=open(resource_ids_and_paths[resource_id],
-                           u'rb'),
-                 ACL=acl)
+        click.secho('Processing file path : {0}'.format(resource_ids_and_paths[resource_id]), fg=u'blue', bold=True)
+        buffered_bytes = open(resource_ids_and_paths[resource_id], u'rb')
+        click.secho('Mimetype for file : {0} '.format(mime.from_file(resource_ids_and_paths[resource_id])))
+        total = os.stat(resource_ids_and_paths[resource_id]).st_size
+        click.secho('Total FileSize : {0}'.format(total), fg=u'yellow', bold=True)
+        s3_connection.Object(bucket_name, key) \
+            .upload_fileobj(buffered_bytes,
+                            ExtraArgs={
+                                'ACL': acl,
+                                'ContentType': mime.from_file(resource_ids_and_paths[resource_id]) or 'text/plain'
+                            },
+                            Config=transfer_config,
+                            Callback=ProcessPercentage(resource_ids_and_paths[resource_id]))
         uploaded_resources.append(resource_id)
         click.secho(
             'Uploaded resource {0} ({1}) to S3'.format(resource_id,
@@ -81,3 +100,22 @@ def upload_resources():
             len(uploaded_resources)),
         fg=u'green',
         bold=True)
+
+
+class ProcessPercentage(object):
+
+    def __init__(self, filename):
+        self._filename = filename
+        self._size = float(os.path.getsize(filename))
+        self._seen_so_far = 0
+        self._lock = threading.Lock()
+
+    def __call__(self, bytes_amount):
+        with self._lock:
+            self._seen_so_far += bytes_amount
+            percentage = (self._seen_so_far / self._size) * 100
+            sys.stdout.write(
+                "\r%s  %s / %s  (%.2f%%)\r" % (
+                    self._filename, self._seen_so_far, self._size,
+                    percentage))
+            sys.stdout.flush()
