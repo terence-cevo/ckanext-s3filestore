@@ -83,6 +83,7 @@ def upload_resources():
         s3_connection.Object(bucket_name, key) \
             .upload_fileobj(buffered_bytes,
                             ExtraArgs={
+                                'StorageClass': 'INTELLIGENT_TIERING',
                                 'ACL': acl,
                                 'ContentType': mime.from_file(resource_ids_and_paths[resource_id]) or 'text/plain'
                             },

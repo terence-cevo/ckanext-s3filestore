@@ -137,6 +137,7 @@ class BaseS3Uploader(object):
             s3.Object(self.bucket_name, filepath). \
                 upload_fileobj(upload_file,
                                ExtraArgs={
+                                   'StorageClass': 'INTELLIGENT_TIERING',
                                    'ACL': 'public-read' if make_public else self.acl,
                                    'ContentType': getattr(self, 'mimetype', '') or 'text/plain'
                                },
