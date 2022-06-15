@@ -71,7 +71,7 @@ class BaseS3Uploader(object):
 
     def get_s3_resource(self):
         return \
-            self.get_s3_session()\
+            self.get_s3_session() \
                 .resource('s3',
                           endpoint_url=self.host_name,
                           config=BotoConfig(
@@ -80,7 +80,7 @@ class BaseS3Uploader(object):
 
     def get_s3_client(self):
         return \
-            self.get_s3_session()\
+            self.get_s3_session() \
                 .client('s3',
                         endpoint_url=self.host_name,
                         config=BotoConfig(
@@ -124,27 +124,23 @@ class BaseS3Uploader(object):
         return bucket
 
     def upload_to_key(self, filepath, upload_file, make_public=False):
-        '''Uploads the `upload_file` to `filepath` on `self.bucket`.'''
+        """Uploads the `upload_file` to `filepath` on `self.bucket`."""
 
         upload_file.seek(0)
 
         s3 = self.get_s3_resource()
-        config = TransferConfig(multipart_threshold=1024 * 25,
-                                max_concurrency= 10,
-                                multipart_chunksize= 1024 * 25,
-                                use_threads= True)
+        transfer_config = TransferConfig(multipart_threshold=1024 * 25,
+                                         max_concurrency=10,
+                                         multipart_chunksize=1024 * 25,
+                                         use_threads=True)
         try:
-            s3.Object(self.bucket_name, filepath).\
-                upload_file(upload_file.read(),
-                              ExtraArgs={
-                                  'ACL':'public-read' if make_public else self.acl,
-                                  'ContentType': getattr(self, 'mimetype', '') or 'text/plain'
-                              },
-                              Config=config)
-            # s3.Object(self.bucket_name, filepath).put(
-            #     Body=upload_file.read(),
-            #     ACL='public-read' if make_public else self.acl,
-            #     ContentType=getattr(self, 'mimetype', '') or 'text/plain')
+            s3.Object(self.bucket_name, filepath). \
+                upload_fileobj(upload_file,
+                               ExtraArgs={
+                                   'ACL': 'public-read' if make_public else self.acl,
+                                   'ContentType': getattr(self, 'mimetype', '') or 'text/plain'
+                               },
+                               Config=transfer_config)
             log.info("Successfully uploaded {0} to S3!".format(filepath))
         except Exception as e:
             log.error('Something went very very wrong for {0}'.format(str(e)))
@@ -152,7 +148,7 @@ class BaseS3Uploader(object):
 
     def clear_key(self, filepath):
         '''Deletes the contents of the key at `filepath` on `self.bucket`.'''
-
+        log.info('From s3 delete file with path : {0}'.format(filepath))
         s3 = self.get_s3_resource()
 
         try:
@@ -188,6 +184,10 @@ class BaseS3Uploader(object):
             url = URL_HOST.sub(self.download_proxy + '/', url, 1)
 
         return url
+
+    def get_file_size(self, filepath):
+        s3 = self.get_s3_resource();
+        return s3.Object(self.bucket_name, filepath).content_length
 
 
 class S3Uploader(BaseS3Uploader):
@@ -307,7 +307,6 @@ class S3ResourceUploader(BaseS3Uploader):
         self.storage_path = os.path.join(path, 'resources')
         self.filename = None
         self.old_filename = None
-
         upload_field_storage = resource.pop('upload', None)
         self.clear = resource.pop('clear_upload', None)
 
@@ -333,7 +332,7 @@ class S3ResourceUploader(BaseS3Uploader):
             self.filesize = self.upload_file.tell()
             # go back to the beginning of the file buffer
             self.upload_file.seek(0, os.SEEK_SET)
-
+            log.debug('The uploaded file size: {0}'.format(self.filesize))
             self.mimetype = resource.get('mimetype')
             if not self.mimetype:
                 try:
@@ -355,10 +354,10 @@ class S3ResourceUploader(BaseS3Uploader):
 
                 except Exception:
                     pass
-
         elif self.clear and resource.get('id'):
             # New, not yet created resources can be marked for deletion if the
             # users cancels an upload and enters a URL instead.
+            # This will also be called on resource_delete
             old_resource = model.Session.query(model.Resource) \
                 .get(resource['id'])
             self.old_filename = old_resource.url
@@ -379,7 +378,6 @@ class S3ResourceUploader(BaseS3Uploader):
 
     def upload(self, id, max_size=10):
         '''Upload the file to S3.'''
-
         # If a filename has been provided (a file is being uploaded) write the
         # file to the appropriate key in the AWS bucket.
         if self.filename:
@@ -397,7 +395,6 @@ class S3ResourceUploader(BaseS3Uploader):
 
     def delete(self, id, filename=None):
         ''' Delete file we are pointing at'''
-
         if filename is None:
             filename = os.path.basename(self.url)
         filename = munge.munge_filename(filename)
@@ -408,3 +405,7 @@ class S3ResourceUploader(BaseS3Uploader):
             log.warning('Key {0} not found in bucket {1} for delete'
                         .format(key_path, self.bucket_name))
             pass
+
+    def find_file_size(self, filename):
+        return self.get_file_size(filepath=filename)
+
