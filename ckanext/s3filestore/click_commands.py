@@ -1,4 +1,3 @@
-
 import os
 import click
 from boto3.s3.transfer import TransferConfig
@@ -10,6 +9,9 @@ from ckanext.s3filestore.uploader import BaseS3Uploader
 import magic
 import sys
 import threading
+import datetime
+from datetime import date
+
 
 @click.command(u's3-upload',
                short_help=u'Uploads all resources '
@@ -70,11 +72,15 @@ def upload_resources():
                                      use_threads=True)
 
     uploaded_resources = []
+    start_time = datetime.datetime.now()
+    click.secho('Started Transfer at : {0}'.format(start_time))
+    uploaded = 0
     for resource_id, file_name in resource_ids_and_names.items():
         total = 0
-        uploaded = 0
+        uploaded += 1
         key = 'resources/{resource_id}/{file_name}'.format(
             resource_id=resource_id, file_name=file_name)
+        click.secho('File Count : {0}'.format(uploaded), fg=u'yellow', bold=True)
         click.secho('Processing file path : {0}'.format(resource_ids_and_paths[resource_id]), fg=u'blue', bold=True)
         buffered_bytes = open(resource_ids_and_paths[resource_id], u'rb')
         click.secho('Mimetype for file : {0} '.format(mime.from_file(resource_ids_and_paths[resource_id])))
@@ -90,12 +96,15 @@ def upload_resources():
                             Config=transfer_config,
                             Callback=ProcessPercentage(resource_ids_and_paths[resource_id]))
         uploaded_resources.append(resource_id)
+        end_time = datetime.datetime.now()
+        diff = end_time - start_time
         click.secho(
-            'Uploaded resource {0} ({1}) to S3'.format(resource_id,
-                                                       file_name),
+            'Uploaded resource {0} ({1}) to S3 in {2}(seconds)'.format(resource_id,
+                                                                       file_name, diff.seconds),
             fg=u'green',
             bold=True)
 
+    click.secho('Ended Transfer at : {0}'.format(datetime.datetime.now()))
     click.secho(
         'Done, uploaded {0} resources to S3'.format(
             len(uploaded_resources)),
