@@ -106,12 +106,12 @@ def upload_resources():
                 fg=u'green',
                 bold=True)
 
-        click.secho('Ended Transfer at : {0}'.format(datetime.datetime.now()))
-        click.secho(
-            'Done, uploaded {0} resources to S3'.format(
-                len(uploaded_resources)),
-            fg=u'green',
-            bold=True)
+    click.secho('Ended Transfer at : {0}'.format(datetime.datetime.now()))
+    click.secho(
+        'Done, uploaded {0} resources to S3'.format(
+            len(uploaded_resources)),
+        fg=u'green',
+        bold=True)
 
 
 class ProcessPercentage(object):
