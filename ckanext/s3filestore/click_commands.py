@@ -78,31 +78,33 @@ def upload_resources():
     for resource_id, file_name in resource_ids_and_names.items():
         total = 0
         uploaded += 1
-        key = 'resources/{resource_id}/{file_name}'.format(
-            resource_id=resource_id, file_name=file_name)
-        click.secho('File Count : {0}'.format(uploaded), fg=u'yellow', bold=True)
-        click.secho('Processing file path : {0}'.format(resource_ids_and_paths[resource_id]), fg=u'blue', bold=True)
-        buffered_bytes = open(resource_ids_and_paths[resource_id], u'rb')
-        click.secho('Mimetype for file : {0} '.format(mime.from_file(resource_ids_and_paths[resource_id])))
-        total = os.stat(resource_ids_and_paths[resource_id]).st_size
-        click.secho('Total FileSize : {0}'.format(total), fg=u'yellow', bold=True)
-        s3_connection.Object(bucket_name, key) \
-            .upload_fileobj(buffered_bytes,
-                            ExtraArgs={
-                                'StorageClass': 'INTELLIGENT_TIERING',
-                                'ACL': acl,
-                                'ContentType': mime.from_file(resource_ids_and_paths[resource_id]) or 'text/plain'
-                            },
-                            Config=transfer_config,
-                            Callback=ProcessPercentage(resource_ids_and_paths[resource_id]))
-        uploaded_resources.append(resource_id)
-        end_time = datetime.datetime.now()
-        diff = end_time - start_time
-        click.secho(
-            'Uploaded resource {0} ({1}) to S3 in {2}(seconds)'.format(resource_id,
-                                                                       file_name, diff.seconds),
-            fg=u'green',
-            bold=True)
+        if uploaded <= 10000:
+            key = 'resources/{resource_id}/{file_name}'.format(
+                resource_id=resource_id, file_name=file_name)
+            click.secho('File Count : {0}'.format(uploaded), fg=u'yellow', bold=True)
+            click.secho('Processing file path : {0}'.format(resource_ids_and_paths[resource_id]), fg=u'blue', bold=True)
+            buffered_bytes = open(resource_ids_and_paths[resource_id], u'rb')
+            click.secho('Mimetype for file : {0} '.format(mime.from_file(resource_ids_and_paths[resource_id])))
+            total = os.stat(resource_ids_and_paths[resource_id]).st_size
+            click.secho('Total FileSize : {0}'.format(total), fg=u'yellow', bold=True)
+            upload_start_time = datetime.datetime.now()
+            s3_connection.Object(bucket_name, key) \
+                .upload_fileobj(buffered_bytes,
+                                ExtraArgs={
+                                    'StorageClass': 'INTELLIGENT_TIERING',
+                                    'ACL': acl,
+                                    'ContentType': mime.from_file(resource_ids_and_paths[resource_id]) or 'text/plain'
+                                },
+                                Config=transfer_config,
+                                Callback=ProcessPercentage(resource_ids_and_paths[resource_id]))
+            uploaded_resources.append(resource_id)
+            end_time = datetime.datetime.now()
+            diff = end_time - upload_start_time
+            click.secho(
+                'Uploaded resource {0} ({1}) to S3 in {2}(seconds)'.format(resource_id,
+                                                                           file_name, diff.seconds),
+                fg=u'green',
+                bold=True)
 
     click.secho('Ended Transfer at : {0}'.format(datetime.datetime.now()))
     click.secho(
