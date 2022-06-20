@@ -24,6 +24,8 @@ def upload_resources():
                                 'postgresql://user:pass@localhost/db')
     bucket_name = config.get('ckanext.s3filestore.aws_bucket_name')
     acl = config.get('ckanext.s3filestore.acl', 'public-read')
+    start_count = config.get('ckanext.s3filestore.migration.start_count')
+    end_count = config.get('ckanext.s3filestore.migration.end_count')
     resource_ids_and_paths = {}
     mime = magic.Magic(mime=True)
     for root, dirs, files in os.walk(storage_path):
@@ -74,11 +76,10 @@ def upload_resources():
     uploaded_resources = []
     start_time = datetime.datetime.now()
     click.secho('Started Transfer at : {0}'.format(start_time))
-    uploaded = 0
+    uploaded = start_count
     for resource_id, file_name in resource_ids_and_names.items():
-        total = 0
         uploaded += 1
-        if uploaded <= 10000:
+        if uploaded <= end_count:
             key = 'resources/{resource_id}/{file_name}'.format(
                 resource_id=resource_id, file_name=file_name)
             click.secho('File Count : {0}'.format(uploaded), fg=u'yellow', bold=True)
@@ -103,6 +104,11 @@ def upload_resources():
             click.secho(
                 'Uploaded resource {0} ({1}) to S3 in {2}(seconds)'.format(resource_id,
                                                                            file_name, diff.seconds),
+                fg=u'green',
+                bold=True)
+        else:
+            click.secho(
+                'Skipping resource {0} ({1})'.format(resource_id, file_name),
                 fg=u'green',
                 bold=True)
 
