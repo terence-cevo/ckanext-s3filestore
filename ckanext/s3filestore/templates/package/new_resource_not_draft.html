@@ -1,0 +1,9 @@
+{% ckan_extends %}
+
+{% block form %}
+    <p>new_resource_not_draft.html</p>
+{#    {% set max_size = h.cloudstorage_max_upload_size() %}#}
+    {% snippet 'snippets/multipart_module.html', pkg_name=pkg_name, parent=super%}
+{% endblock %}
+
+

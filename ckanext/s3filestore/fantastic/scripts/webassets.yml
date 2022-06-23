@@ -1,0 +1,8 @@
+main:
+  filters: rjsmin
+  output: s3filestore/%(version)s_main.js
+  extra:
+    preload:
+      - base/main
+  contents:
+    - s3filestore-multipart-upload.js
