@@ -61,7 +61,7 @@ ckan.module("s3filestore-multipart-upload", function($, _) {
                 url: '',
                 type: 'PUT',
                 maxSize: 10737418240,
-                maxChunkSizeNew: 1048576,
+                maxChunkSize: 4294967296,
                 replaceFileInput: false,
                 paramName: 'upload',
                 multipart: false,
@@ -92,40 +92,29 @@ ckan.module("s3filestore-multipart-upload", function($, _) {
 
         _onChunkSend: function(event, data) {
             console.log('Inside chunk send with data :' + data)
-            if(this._signedUrls.length >= this._partNumber){
-                var url = this._signedUrls[this._partNumber-1]
-                this._file.fileupload("option", "url", url);
-                event.target.formAction=url;
-                this._partNumber += 1;
-                this._uploadedParts += 1;
-                console.log('Set the preseigned url for chunk :'+this._partNumber);
-                console.log('The aws url is set to :'+ url)
-            }
+        },
+
+        _onChunkBeforeSend: function(event, data) {
+          console.log('called on chunk before send.');
+            // var target = $(event.target);
+            // if (this._signedUrls.length > 0) {
+            //     var url = this._signedUrls[this._partNumber -1]
+            //     target.fileupload("option", "url", url);
+            //     console.log('set the fileupload url to : ' + target.fileupload("option", "url"));
+            // } else{
+            //     this.sandbox.notify(
+            //         "Upload error",
+            //         this.i18n("undefined chunk"),
+            //         "error"
+            //     );
+            //     return false;
+            // }
 
         },
 
-        // _onChunkBeforeSend: function(event, data) {
-        //   console.log('called on chunk before send.');
-        //     // var target = $(event.target);
-        //     // if (this._signedUrls.length > 0) {
-        //     //     var url = this._signedUrls[this._partNumber -1]
-        //     //     target.fileupload("option", "url", url);
-        //     //     console.log('set the fileupload url to : ' + target.fileupload("option", "url"));
-        //     // } else{
-        //     //     this.sandbox.notify(
-        //     //         "Upload error",
-        //     //         this.i18n("undefined chunk"),
-        //     //         "error"
-        //     //     );
-        //     //     return false;
-        //     // }
-        //
-        // },
-
-        _onChunkUploaded: function(event, data) {
+        _onChunkUploaded: function() {
             console.log('called onChunkUploaded');
-            this._parts.push({'ETag': data.jqXHR.getResponseHeader('ETag'), 'PartNumber': this._partNumber});
-
+            this._uploadedParts = this._partNumber++;
         },
 
         // _onCheckExistingMultipart: function(operation) {
@@ -281,7 +270,9 @@ ckan.module("s3filestore-multipart-upload", function($, _) {
                 file.size,
                 target.fileupload("option", "maxChunkSize")
             );
-            if(
+            console.log('File upload chunksize: ' + chunkSize)
+
+            if (
                 this._uploadName &&
                 this._uploadSize &&
                 this._uploadedParts !== null
@@ -409,7 +400,8 @@ ckan.module("s3filestore-multipart-upload", function($, _) {
                     function(data) {
                            self._signedUrls = data.result.signed_urls;
                            self._s3UploadId = data.result.upload_id;
-                            if(self._signedUrls.length > 0) {
+                           self._uploadedParts = self._signedUrls.length || 1;
+                            if (self._signedUrls.length > 0) {
                                 var url = self._signedUrls[self._partNumber-1]
                                 self._file.fileupload("option", "url", url);
                                 console.log('Set the preseigned url');
@@ -471,6 +463,7 @@ ckan.module("s3filestore-multipart-upload", function($, _) {
             console.log('Finished upload data: ' + data)
             var self = this;
             console.log('Etag for Part: ' + data.jqXHR.getResponseHeader('Etag'))
+            self._parts.push({'ETag': data.jqXHR.getResponseHeader('Etag'), 'PartNumber': this._partNumber})
             var data_dict = {
                 uploadId: self._uploadId,
                 id: self._resourceId,
@@ -479,43 +472,43 @@ ckan.module("s3filestore-multipart-upload", function($, _) {
                 parts: self._parts,
                 S3upload_id: self._s3UploadId
             };
-            this.sandbox.client.call(
-                "POST",
-                "s3filestore_finish_multipart",
-                data_dict,
-                function(data) {
-                    self._progress.hide("fast");
-                    self._onDisableSave(false);
-
-                    if (self._resourceId && self._packageId) {
-                        self.sandbox.notify(
-                            "Success",
-                            self.i18n("upload_completed"),
-                            "success"
-                        );
-                        // self._form.remove();
-                        if (self._clickedBtn == "again") {
-                            this._redirect_url = self.sandbox.url(
-                                "/dataset/new_resource/" + self._packageId
-                            );
-                        } else {
-                            this._redirect_url = self.sandbox.url(
-                                "/dataset/" + self._packageId
-                            );
-                        }
-                        self._form.attr("action", this._redirect_url);
-                        self._form.attr("method", "GET");
-                        self.$("[name]").attr("name", null);
-                        setTimeout(function() {
-                            self._form.submit();
-                        }, 3000);
-                    }
-                },
-                function(err) {
-                    console.error(err);
-                    self._onHandleError(self.i18n("unable_to_complete_upload"));
-                }
-            );
+            // this.sandbox.client.call(
+            //     "POST",
+            //     "s3filestore_finish_multipart",
+            //     data_dict,
+            //     function(data) {
+            //         self._progress.hide("fast");
+            //         self._onDisableSave(false);
+            //
+            //         if (self._resourceId && self._packageId) {
+            //             self.sandbox.notify(
+            //                 "Success",
+            //                 self.i18n("upload_completed"),
+            //                 "success"
+            //             );
+            //             // self._form.remove();
+            //             if (self._clickedBtn == "again") {
+            //                 this._redirect_url = self.sandbox.url(
+            //                     "/dataset/new_resource/" + self._packageId
+            //                 );
+            //             } else {
+            //                 this._redirect_url = self.sandbox.url(
+            //                     "/dataset/" + self._packageId
+            //                 );
+            //             }
+            //             self._form.attr("action", this._redirect_url);
+            //             self._form.attr("method", "GET");
+            //             self.$("[name]").attr("name", null);
+            //             setTimeout(function() {
+            //                 self._form.submit();
+            //             }, 3000);
+            //         }
+            //     },
+            //     function(err) {
+            //         console.error(err);
+            //         self._onHandleError(self.i18n("unable_to_finish"));
+            //     }
+            // );
             self._progress.hide("fast");
             self._onDisableSave(false);
 

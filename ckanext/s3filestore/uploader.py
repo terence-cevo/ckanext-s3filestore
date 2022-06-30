@@ -58,7 +58,7 @@ class BaseS3Uploader(object):
         self.addressing_style = \
             config.get('ckanext.s3filestore.addressing_style', 'auto')
         self.signed_url_expiry = \
-            int(config.get('ckanext.s3filestore.signed_url_expiry', '900'))
+            int(config.get('ckanext.s3filestore.signed_url_expiry', '3600'))
 
     def get_directory(self, id, storage_path):
         directory = os.path.join(storage_path, id)
@@ -186,23 +186,29 @@ class BaseS3Uploader(object):
 
     def get_signed_url_to_key_for_upload(self, method, key, extra_params={}):
         client = self.get_s3_client()
-        params = { 'Bucket': self.bucket_name,'Key': key}
+        params = {'Bucket': self.bucket_name, 'Key': key}
         params.update(extra_params)
         url = client.generate_presigned_url(ClientMethod=method,
                                             Params=params,
                                             ExpiresIn=self.signed_url_expiry)
         return url
 
-    def create_multipart_upload_part(self, key, part_number):
+    def create_multipart_upload_id(self, key):
         client = self.get_s3_client()
         mpu = client.create_multipart_upload(Bucket=self.bucket_name,
+                                             StorageClass='INTELLIGENT_TIERING',
                                              Key=key)
         log.debug('Created the multipart upload with id: {0}'.format(mpu['UploadId']))
+
+        return {'upload_id': mpu['UploadId']}
+
+    def create_multipart_upload_part(self, key, part_number, upload_id):
+        client = self.get_s3_client()
         url = self.get_signed_url_to_key_for_upload(method='upload_part',
                                                     key=key,
                                                     extra_params={'PartNumber': part_number,
-                                                                        'UploadId': mpu['UploadId']})
-        return {'url': url, 'upload_id': mpu['UploadId']}
+                                                                  'UploadId': upload_id})
+        return {'url': url}
 
     def complete_multipart_upload(self, key, parts, upload_id):
         client = self.get_s3_client()
@@ -210,8 +216,8 @@ class BaseS3Uploader(object):
             cpu = client.complete_multipart_upload(Bucket=self.bucket_name,
                                                    Key=key,
                                                    MultipartUpload={'Parts': parts},
-                                                   UploadId= upload_id)
-        except EntityTooSmall:
+                                                   UploadId=upload_id)
+        except botocore.exceptions.EntityTooSmall as ets:
             raise toolkit.ValidationError(
                 {
                     "uploader": [
@@ -219,7 +225,7 @@ class BaseS3Uploader(object):
                     ]
                 }
             )
-        except InvalidPart:
+        except botocore.exceptions.InvalidPart as ip:
             raise toolkit.ValidationError(
                 {
                     "uploader": [
@@ -228,7 +234,7 @@ class BaseS3Uploader(object):
                     ]
                 }
             )
-        except InvalidPartOrder:
+        except botocore.exceptions.InvalidPartOrder as ipo:
             raise toolkit.ValidationError(
                 {
                     "uploader": [
@@ -236,7 +242,7 @@ class BaseS3Uploader(object):
                     ]
                 }
             )
-        except NoSuchUpload:
+        except botocore.exceptions.NoSuchUpload as nsu:
             raise toolkit.ValidationError(
                 {
                     "uploader": [
@@ -246,7 +252,7 @@ class BaseS3Uploader(object):
                 }
             )
 
-        return true
+        return True
 
     def get_file_size(self, filepath):
         s3 = self.get_s3_resource();

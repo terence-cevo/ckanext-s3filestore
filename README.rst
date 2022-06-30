@@ -21,9 +21,25 @@
 ckanext-s3filestore
 ===================
 
-.. Put a description of your extension here:
+Supports chunked uploads direct to S3, bypassing buffering content into CKAN.
 
-Use Amazon S3 or Minio<https://minio.io/> as a filestore for resources.
+Default::
+
+     ckanext.s3filestore.max_file_upload_size_in_bytes = 10737418240
+     ckanext.s3filestore.max_file_part_size_in_bytes = 4294967296
+
+
+
+------------
+Note:
+------------
+AWS Supports a maximum of 5GB in one chunk and a max of 1000 pre-signed urls.
+
+Use Amazon S3 as a filestore for resources.
+
+As chunked files are to be stitched together using the (finish_multipart) CKAN action after a successful upload to S3 is complete,
+
+Server session timeout is to be considered as a factor to decide upper thresholds for file size and chunk size
 
 
 ------------

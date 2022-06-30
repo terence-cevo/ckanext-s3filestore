@@ -4,5 +4,8 @@ main:
   extra:
     preload:
       - base/main
+      - vendor/fileupload
   contents:
-    - s3filestore-multipart-upload.js
+    - vendor/jquery-widget.js
+    - vendor/file-upload.js
+    - s3filestore-chunked-upload.js
