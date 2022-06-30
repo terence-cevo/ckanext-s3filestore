@@ -52,24 +52,26 @@ def initiate_multipart(context, data_dict):
         chunk_count = math.floor(chunk_count) + 1
     key = 'resources/{0}/{1}'.format(id, name)
     upload_id = uploader.create_multipart_upload_id(key).get('upload_id', '')
-    log.debug('Number of presgined urls to create : {0}'.format(chunk_count))
-    # Use Presgined URLs with multipart upload for files bigger than 4GB
-    # Else Use Presigned URLs for file sizes less than 4GB
+    log.debug('Number of pre-signed urls to create : {0}'.format(chunk_count))
+    # Use Pre-signed URLs with multipart upload for files bigger than 4GB
+    # Else Use Pre-signed URLs for file sizes less than 4GB
     if chunk_count > 1:
         part_count = 1
         while chunk_count >= 1:
-            presigned_urls\
+            presigned_urls \
                 .append(uploader.create_multipart_upload_part(key=key,
                                                               part_number=part_count,
                                                               upload_id=upload_id)
-                .get('url', None))
+                        .get('url', None))
             part_count += 1
             chunk_count -= 1
     else:
         log.debug('File chunk size is not bigger than : {0}'.format(config.get('ckanext.s3filestore.file.chunk_size_in_bytes', "4294967296")))
         key = 'resources/{0}/'.format(id) + munge.munge_filename('{0}'.format(name))
         log.debug('Creating sigv4 with key: {0}'.format(key))
-        presigned_urls.append(uploader.get_signed_url_to_key_for_upload('put_object', key))
+        presigned_urls.append(uploader.get_signed_url_to_key_for_upload('put_object',
+                                                                        key,
+                                                                        {'StorageClass': 'INTELLIGENT_TIERING'}))
 
     return {"id": id, "name": name, "signed_urls": presigned_urls, "upload_id": upload_id}
 

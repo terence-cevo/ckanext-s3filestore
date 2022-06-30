@@ -186,7 +186,7 @@ class BaseS3Uploader(object):
 
     def get_signed_url_to_key_for_upload(self, method, key, extra_params={}):
         client = self.get_s3_client()
-        params = {'Bucket': self.bucket_name, 'Key': key, 'StorageClass': 'INTELLIGENT_TIERING'}
+        params = {'Bucket': self.bucket_name, 'Key': key}
         params.update(extra_params)
         url = client.generate_presigned_url(ClientMethod=method,
                                             Params=params,
@@ -196,6 +196,7 @@ class BaseS3Uploader(object):
     def create_multipart_upload_id(self, key):
         client = self.get_s3_client()
         mpu = client.create_multipart_upload(Bucket=self.bucket_name,
+                                             StorageClass='INTELLIGENT_TIERING',
                                              Key=key)
         log.debug('Created the multipart upload with id: {0}'.format(mpu['UploadId']))
 
@@ -206,7 +207,7 @@ class BaseS3Uploader(object):
         url = self.get_signed_url_to_key_for_upload(method='upload_part',
                                                     key=key,
                                                     extra_params={'PartNumber': part_number,
-                                                                  'UploadId':upload_id})
+                                                                  'UploadId': upload_id})
         return {'url': url}
 
     def complete_multipart_upload(self, key, parts, upload_id):

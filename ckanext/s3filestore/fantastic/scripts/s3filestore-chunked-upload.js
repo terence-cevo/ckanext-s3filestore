@@ -224,7 +224,10 @@ ckan.module("s3filestore-multipart-upload", function($, _) {
                         this._bar.attr("listener", "true");
                     }
                     request.open('PUT', fileParts[i]['url'], true);
-                    request.setRequestHeader('x-amz-storage-class', 'INTELLIGENT_TIERING')
+                    // Apply this header only if the file is not a chunked upload.
+                    if (fileParts.length === 1) {
+                        request.setRequestHeader('x-amz-storage-class', 'INTELLIGENT_TIERING')
+                    }
                     request.send(fileParts[i]['data']);
                     request.onload = function() {
                         // Stitch the file only if there is more than one chunk.
