@@ -1,0 +1,11 @@
+{% asset 's3filestore-js/main' %}
+<div
+    data-module="s3filestore-multipart-upload"
+    data-module-cloud='S3'
+    data-module-package-id="_{{ pkg_name }}"
+    data-module-file-part-max-size="{{ file_part_max_size }}"
+    data-module-file-max-size="{{ file_max_size }}"
+>
+    {{ parent() }}
+
+</div>
