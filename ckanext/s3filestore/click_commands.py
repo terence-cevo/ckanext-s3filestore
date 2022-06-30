@@ -1,4 +1,3 @@
-
 import os
 import click
 from boto3.s3.transfer import TransferConfig
@@ -10,6 +9,9 @@ from ckanext.s3filestore.uploader import BaseS3Uploader
 import magic
 import sys
 import threading
+import datetime
+from datetime import date
+
 
 @click.command(u's3-upload',
                short_help=u'Uploads all resources '
@@ -22,6 +24,8 @@ def upload_resources():
                                 'postgresql://user:pass@localhost/db')
     bucket_name = config.get('ckanext.s3filestore.aws_bucket_name')
     acl = config.get('ckanext.s3filestore.acl', 'public-read')
+    start_count = int(config.get('ckanext.s3filestore.migration.start_count'))
+    end_count = int(config.get('ckanext.s3filestore.migration.end_count'))
     resource_ids_and_paths = {}
     mime = magic.Magic(mime=True)
     for root, dirs, files in os.walk(storage_path):
@@ -70,31 +74,50 @@ def upload_resources():
                                      use_threads=True)
 
     uploaded_resources = []
-    for resource_id, file_name in resource_ids_and_names.items():
-        total = 0
-        uploaded = 0
-        key = 'resources/{resource_id}/{file_name}'.format(
-            resource_id=resource_id, file_name=file_name)
-        click.secho('Processing file path : {0}'.format(resource_ids_and_paths[resource_id]), fg=u'blue', bold=True)
-        buffered_bytes = open(resource_ids_and_paths[resource_id], u'rb')
-        click.secho('Mimetype for file : {0} '.format(mime.from_file(resource_ids_and_paths[resource_id])))
-        total = os.stat(resource_ids_and_paths[resource_id]).st_size
-        click.secho('Total FileSize : {0}'.format(total), fg=u'yellow', bold=True)
-        s3_connection.Object(bucket_name, key) \
-            .upload_fileobj(buffered_bytes,
-                            ExtraArgs={
-                                'ACL': acl,
-                                'ContentType': mime.from_file(resource_ids_and_paths[resource_id]) or 'text/plain'
-                            },
-                            Config=transfer_config,
-                            Callback=ProcessPercentage(resource_ids_and_paths[resource_id]))
-        uploaded_resources.append(resource_id)
+    start_time = datetime.datetime.now()
+    click.secho('Started Transfer at : {0}'.format(start_time))
+    uploaded = start_count
+    while uploaded > 0:
+        count = 0
+        keys = list(resource_ids_and_names.keys())
         click.secho(
-            'Uploaded resource {0} ({1}) to S3'.format(resource_id,
-                                                       file_name),
+            'Skipping resource {0}'.format(keys[count]),
             fg=u'green',
             bold=True)
+        resource_ids_and_names.pop(keys[count])
+        count += count
+        uploaded -= 1
+    for resource_id, file_name in resource_ids_and_names.items():
+        if start_count <= end_count:
+            start_count += 1
+            key = 'resources/{resource_id}/{file_name}'.format(
+                resource_id=resource_id, file_name=file_name)
+            click.secho('File Count : {0}'.format(start_count), fg=u'yellow', bold=True)
+            click.secho('Processing file path : {0}'.format(resource_ids_and_paths[resource_id]), fg=u'blue', bold=True)
+            buffered_bytes = open(resource_ids_and_paths[resource_id], u'rb')
+            click.secho('Mimetype for file : {0} '.format(mime.from_file(resource_ids_and_paths[resource_id])))
+            total = os.stat(resource_ids_and_paths[resource_id]).st_size
+            click.secho('Total FileSize : {0}'.format(total), fg=u'yellow', bold=True)
+            upload_start_time = datetime.datetime.now()
+            s3_connection.Object(bucket_name, key) \
+                .upload_fileobj(buffered_bytes,
+                                ExtraArgs={
+                                    'StorageClass': 'INTELLIGENT_TIERING',
+                                    'ACL': acl,
+                                    'ContentType': mime.from_file(resource_ids_and_paths[resource_id]) or 'text/plain'
+                                },
+                                Config=transfer_config,
+                                Callback=ProcessPercentage(resource_ids_and_paths[resource_id]))
+            uploaded_resources.append(resource_id)
+            end_time = datetime.datetime.now()
+            diff = end_time - upload_start_time
+            click.secho(
+                'Uploaded resource {0} ({1}) to S3 in {2}(seconds)'.format(resource_id,
+                                                                           file_name, diff.seconds),
+                fg=u'green',
+                bold=True)
 
+    click.secho('Ended Transfer at : {0}'.format(datetime.datetime.now()))
     click.secho(
         'Done, uploaded {0} resources to S3'.format(
             len(uploaded_resources)),

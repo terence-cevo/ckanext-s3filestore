@@ -3,13 +3,20 @@ import ckan.plugins as plugins
 import ckantoolkit as toolkit
 
 import ckanext.s3filestore.uploader
+from ckanext.s3filestore.logic.action import get_actions
+from ckanext.s3filestore.logic.auth import get_auth_functions
 from ckanext.s3filestore.views import resource, uploads
 from ckanext.s3filestore.click_commands import upload_resources
+from ckanext.s3filestore import helpers
+import ckan.lib.munge as munge
 
 
 class S3FileStorePlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.IConfigurable)
+    plugins.implements(plugins.IActions)
+    plugins.implements(plugins.IAuthFunctions)
+    plugins.implements(plugins.ITemplateHelpers)
     plugins.implements(plugins.IUploader)
     plugins.implements(plugins.IBlueprint)
     plugins.implements(plugins.IClick)
@@ -18,11 +25,16 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
     # IConfigurer
 
     def update_config(self, config_):
+        # We need to register the following templates dir
         toolkit.add_template_directory(config_, 'templates')
-        # We need to register the following templates dir in order
-        # to fix downloading the HTML file instead of previewing when
-        # 'webpage_view' is enabled
-        toolkit.add_template_directory(config_, 'theme/templates')
+        toolkit.add_resource("fantastic/scripts", "s3filestore-js")
+
+    # ITemplateHelpers
+    def get_helpers(self):
+        return dict(
+            s3filestore_max_file_upload_size_in_bytes=helpers.max_file_upload_size,
+            s3filestore_max_file_part_size_in_bytes=helpers.max_file_part_size,
+        )
 
     # IConfigurable
 
@@ -51,6 +63,16 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
             ckanext.s3filestore.uploader.BaseS3Uploader().get_s3_bucket(
                 config.get('ckanext.s3filestore.aws_bucket_name'))
 
+    # IActions
+
+    def get_actions(self):
+        return get_actions()
+
+    # IAuthFunctions
+
+    def get_auth_functions(self):
+        return get_auth_functions()
+
     # IUploader
 
     def get_resource_uploader(self, data_dict):
@@ -65,7 +87,7 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
     # IBlueprint
 
     def get_blueprint(self):
-        blueprints = resource.get_blueprints() +\
+        blueprints = resource.get_blueprints() + \
                      uploads.get_blueprints()
         return blueprints
 
@@ -75,6 +97,9 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
         return [upload_resources]
 
     # IResourceController
+    def before_create(self, context, resource):
+        filename = munge.munge_filename(resource.get('name'))
+        resource['name'] = filename
 
     def before_delete(self, context, resource, resources):
         # let's get all info about our resource. It somewhere in resources

@@ -1,0 +1,9 @@
+{% ckan_extends %}
+
+{% block form %}
+    {% set file_max_size = h.s3filestore_max_file_upload_size_in_bytes() %}
+    {% set file_part_max_size = h.s3filestore_max_file_part_size_in_bytes() %}
+    {% snippet 'snippets/multipart_module.html', pkg_name=pkg_name, file_max_size=file_max_size, file_part_max_size=file_part_max_size, parent=super%}
+{% endblock %}
+
+

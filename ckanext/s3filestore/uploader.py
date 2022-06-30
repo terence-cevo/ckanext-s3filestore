@@ -171,19 +171,88 @@ class BaseS3Uploader(object):
         # check whether the object exists in S3
         client.head_object(Bucket=self.bucket_name, Key=key)
 
-        params = {'Bucket': self.bucket_name,
-                  'Key': key
-                  }
+        params = {'Bucket': self.bucket_name,'Key': key}
 
         params.update(extra_params)
 
         url = client.generate_presigned_url(ClientMethod='get_object',
                                             Params=params,
                                             ExpiresIn=self.signed_url_expiry)
+
         if self.download_proxy:
             url = URL_HOST.sub(self.download_proxy + '/', url, 1)
 
         return url
+
+    def get_signed_url_to_key_for_upload(self, method, key, extra_params={}):
+        client = self.get_s3_client()
+        params = {'Bucket': self.bucket_name, 'Key': key}
+        params.update(extra_params)
+        url = client.generate_presigned_url(ClientMethod=method,
+                                            Params=params,
+                                            ExpiresIn=self.signed_url_expiry)
+        return url
+
+    def create_multipart_upload_id(self, key):
+        client = self.get_s3_client()
+        mpu = client.create_multipart_upload(Bucket=self.bucket_name,
+                                             StorageClass='INTELLIGENT_TIERING',
+                                             Key=key)
+        log.debug('Created the multipart upload with id: {0}'.format(mpu['UploadId']))
+
+        return {'upload_id': mpu['UploadId']}
+
+    def create_multipart_upload_part(self, key, part_number, upload_id):
+        client = self.get_s3_client()
+        url = self.get_signed_url_to_key_for_upload(method='upload_part',
+                                                    key=key,
+                                                    extra_params={'PartNumber': part_number,
+                                                                  'UploadId': upload_id})
+        return {'url': url}
+
+    def complete_multipart_upload(self, key, parts, upload_id):
+        client = self.get_s3_client()
+        try:
+            cpu = client.complete_multipart_upload(Bucket=self.bucket_name,
+                                                   Key=key,
+                                                   MultipartUpload={'Parts': parts},
+                                                   UploadId=upload_id)
+        except botocore.exceptions.EntityTooSmall as ets:
+            raise toolkit.ValidationError(
+                {
+                    "uploader": [
+                        "Each part must be at least 5 MB in size, except the last part."
+                    ]
+                }
+            )
+        except botocore.exceptions.InvalidPart as ip:
+            raise toolkit.ValidationError(
+                {
+                    "uploader": [
+                        "One or more of the specified parts could not be found. The part might not have been uploaded, "
+                        "or the specified entity tag might not have matched the part's entity tag"
+                    ]
+                }
+            )
+        except botocore.exceptions.InvalidPartOrder as ipo:
+            raise toolkit.ValidationError(
+                {
+                    "uploader": [
+                        "The list of parts was not in ascending order. "
+                    ]
+                }
+            )
+        except botocore.exceptions.NoSuchUpload as nsu:
+            raise toolkit.ValidationError(
+                {
+                    "uploader": [
+                        "The specified multipart upload does not exist. "
+                        "The upload ID might be invalid, or the multipart upload might have been aborted or completed."
+                    ]
+                }
+            )
+
+        return True
 
     def get_file_size(self, filepath):
         s3 = self.get_s3_resource();
@@ -203,7 +272,7 @@ class S3Uploader(BaseS3Uploader):
         Create a storage path in the format:
         <ckanext.s3filestore.aws_storage_path>/storage/uploads/<upload_to>/
         '''
-
+        log.debug('inside the uploaded with upload_to: {0}'.format(upload_to));
         super(S3Uploader, self).__init__()
 
         self.storage_path = self.get_storage_path(upload_to)
