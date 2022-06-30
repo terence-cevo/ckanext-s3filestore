@@ -122,3 +122,6 @@ def finish_multipart(context, data_dict):
 
     return {"commited": True}
 
+
+def keep_alive_multipart(context, data_dict):
+    return {"keep_alive": True}

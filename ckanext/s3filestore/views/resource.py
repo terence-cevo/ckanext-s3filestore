@@ -26,7 +26,6 @@ get_action = logic.get_action
 abort = base.abort
 redirect = toolkit.redirect_to
 
-
 s3_resource = Blueprint(
     u's3_resource',
     __name__,
@@ -40,12 +39,14 @@ def resource_download(package_type, id, resource_id, filename=None):
     Provide a download by either redirecting the user to the url stored or
     downloading the uploaded file from S3.
     '''
+    log.debug('Downloading resource from S3')
     context = {'model': model, 'session': model.Session,
                'user': c.user or c.author, 'auth_user_obj': c.userobj}
 
     try:
         rsc = get_action('resource_show')(context, {'id': resource_id})
         get_action('package_show')(context, {'id': id})
+        log.debug('Resource of type : {0}'.format(rsc))
     except NotFound:
         return abort(404, _('Resource not found'))
     except NotAuthorized:
@@ -67,10 +68,13 @@ def resource_download(package_type, id, resource_id, filename=None):
 
         try:
             if preview:
+                log.debug('Preview file')
                 url = upload.get_signed_url_to_key(key_path)
             else:
                 file_size = upload.find_file_size(filename=key_path)
+                log.debug('Content-Length1: {0}'.format(file_size))
                 # If a file size is greater than 10MB it should then automatically download the file
+                # instead of allowing users to view the file inside the browser
                 if file_size >= 10485760:
                     params = {
                         'ResponseContentDisposition':
@@ -79,7 +83,7 @@ def resource_download(package_type, id, resource_id, filename=None):
                     url = upload.get_signed_url_to_key(key_path, params)
                 else:
                     url = upload.get_signed_url_to_key(key_path)
-
+            log.debug('PresignedURL to get_object: {0}'.format(url))
             return redirect(url)
 
         except ClientError as ex:
