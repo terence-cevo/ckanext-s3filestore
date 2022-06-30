@@ -1,102 +1,220 @@
-CKAN: The Open Source Data Portal Software
-==========================================
+.. You should enable this project on travis-ci.org and coveralls.io to make
+these badges work. The necessary Travis and Coverage config files have been
+generated for you.
 
-.. image:: https://img.shields.io/badge/license-AGPL-blue.svg?style=flat
-    :target: https://opensource.org/licenses/AGPL-3.0
-    :alt: License
-
-.. image:: https://img.shields.io/badge/docs-latest-brightgreen.svg?style=flat
-    :target: http://docs.ckan.org
-    :alt: Documentation
-.. image:: https://img.shields.io/badge/support-StackOverflow-yellowgreen.svg?style=flat
-    :target: https://stackoverflow.com/questions/tagged/ckan
-    :alt: Support on StackOverflow
-
-.. image:: https://circleci.com/gh/ckan/ckan.svg?style=shield
-    :target: https://circleci.com/gh/ckan/ckan
-    :alt: Build Status
-
-.. image:: https://coveralls.io/repos/github/ckan/ckan/badge.svg?branch=master
-    :target: https://coveralls.io/github/ckan/ckan?branch=master
-    :alt: Coverage Status
-
-.. image:: https://badges.gitter.im/gitterHQ/gitter.svg
-    :target: https://gitter.im/ckan/chat
-    :alt: Chat on Gitter
-
-**CKAN is the world’s leading open-source data portal platform**.
-CKAN makes it easy to publish, share and work with data. It's a data management
-system that provides a powerful platform for cataloging, storing and accessing
-datasets with a rich front-end, full API (for both data and catalog), visualization
-tools and more. Read more at `ckan.org <http://ckan.org/>`_.
+.. image:: https://github.com/keitaroinc/ckanext-s3filestore/workflows/CI/badge.svg
+    :target: https://github.com/keitaroinc/ckanext-s3filestore/actions
 
 
+.. image:: https://coveralls.io/repos/github/keitaroinc/ckanext-s3filestore/badge.svg?branch=main
+     :target: https://coveralls.io/github/keitaroinc/ckanext-s3filestore?branch=main
+
+.. image:: https://img.shields.io/badge/python-3.8-blue.svg
+    :target: https://www.python.org/downloads/release/python-384/
+
+.. image:: https://img.shields.io/pypi/v/ckanext-s3filestore
+    :target: https://pypi.org/project/ckanext-s3filestore
+
+
+
+===================
+ckanext-s3filestore
+===================
+
+Supports chunked uploads direct to S3, bypassing buffering content into CKAN.
+
+Default::
+
+     ckanext.s3filestore.max_file_upload_size_in_bytes = 10737418240
+     ckanext.s3filestore.max_file_part_size_in_bytes = 4294967296
+
+
+
+------------
+Note:
+------------
+AWS Supports a maximum of 5GB in one chunk and a max of 1000 pre-signed urls.
+
+Use Amazon S3 as a filestore for resources.
+
+As chunked files are to be stitched together using the (finish_multipart) CKAN action after a successful upload to S3 is complete,
+
+Server session timeout is to be considered as a factor to decide upper thresholds for file size and chunk size
+
+
+------------
+Requirements
+------------
+
+Requires CKAN 2.9+
+
+When installing this extension on CKAN versions prior 2.9 please use `ckan-2.8 <https://github.com/keitaroinc/ckanext-s3filestore/tree/ckan-2.8>`_ branch.
+
+------------
 Installation
 ------------
 
-See the `CKAN Documentation <http://docs.ckan.org>`_ for installation instructions.
+.. Add any additional install steps to the list below.
+For example installing any non-Python dependencies or adding any required
+config settings.
+
+To install ckanext-s3filestore:
+
+1. Activate your CKAN virtual environment, for example::
+
+     . /usr/lib/ckan/default/bin/activate
+
+2. Install the ckanext-s3filestore Python package into your virtual environment::
+
+     pip install ckanext-s3filestore
+
+3. Add ``s3filestore`` to the ``ckan.plugins`` setting in your CKAN
+   config file (by default the config file is located at
+   ``/etc/ckan/default/ckan.ini``).
+
+4. Restart CKAN. For example if you've deployed CKAN with Apache on Ubuntu::
+
+     sudo service apache2 reload
 
 
-Support
--------
-If you need help with CKAN or want to ask a question, use either the
-`ckan-dev`_ mailing list, the `CKAN chat on Gitter`_, or the `CKAN tag on Stack Overflow`_ (try
-searching the Stack Overflow and ckan-dev `archives`_ for an answer to your
-question first).
+---------------
+Config Settings
+---------------
 
-If you've found a bug in CKAN, open a new issue on CKAN's `GitHub Issues`_ (try
-searching first to see if there's already an issue for your bug).
+Required::
 
-If you find a potential security vulnerability please email security@ckan.org,
-rather than creating a public issue on GitHub.
+    ckanext.s3filestore.aws_bucket_name = a-bucket-to-store-your-stuff
+    ckanext.s3filestore.region_name= region-name
+    ckanext.s3filestore.signature_version = s3v4
 
-.. _CKAN tag on Stack Overflow: http://stackoverflow.com/questions/tagged/ckan
-.. _archives: https://groups.google.com/a/ckan.org/g/ckan-dev
-.. _GitHub Issues: https://github.com/ckan/ckan/issues
-.. _CKAN chat on Gitter: https://gitter.im/ckan/chat
+Conditional::
 
+    ckanext.s3filestore.aws_access_key_id = Your-Access-Key-ID
+    ckanext.s3filestore.aws_secret_access_key = Your-Secret-Access-Key
 
-Contributing to CKAN
---------------------
+    Or:
 
-For contributing to CKAN or its documentation, see
-`CONTRIBUTING <https://github.com/ckan/ckan/blob/master/CONTRIBUTING.md>`_.
+    ckanext.s3filestore.aws_use_ami_role = true
 
-Mailing List
-~~~~~~~~~~~~
+Optional::
 
-Subscribe to the `ckan-dev`_ mailing list to receive news about upcoming releases and
-future plans as well as questions and discussions about CKAN development, deployment, etc.
+    # An optional path to prepend to keys
+    ckanext.s3filestore.aws_storage_path = my-site-name
 
-Community Chat
-~~~~~~~~~~~~~~
+    # An optional setting to fallback to filesystem for downloads
+    ckanext.s3filestore.filesystem_download_fallback = true
+    # The ckan storage path option must also be set correctly for the fallback to work
+    ckan.storage_path = path/to/storage/directory
 
-If you want to talk about CKAN development say hi to the CKAN developers and members of
-the CKAN community on the public `CKAN chat on Gitter`_. Gitter is free and open-source;
-you can sign in with your GitHub, GitLab, or Twitter account.
+    # An optional setting to change the acl of the uploaded files. Default public-read.
+    ckanext.s3filestore.acl = private
 
-The logs for the old `#ckan`_ IRC channel (2014 to 2018) can be found here:
-https://github.com/ckan/irc-logs.
+    # An optional setting to specify which addressing style to use. This controls whether the bucket name is in the hostname or is part of the URL. Default auto.
+    ckanext.s3filestore.addressing_style = path
 
-Wiki
-~~~~
+    # Set this parameter only if you want to use Minio as a filestore service instead of S3.
+    ckanext.s3filestore.host_name = http://minio-service.com
 
-If you've figured out how to do something with CKAN and want to document it for
-others, make a new page on the `CKAN wiki`_ and tell us about it on the
-ckan-dev mailing list or on Gitter.
+    # To mask the S3 endpoint with your own domain/endpoint when serving URLs to end users.
+    # This endpoint should be capable of serving S3 objects as if it were an actual bucket.
+    # The real S3 endpoint will still be used for uploading files.
+    ckanext.s3filestore.download_proxy = https://example.com/my-bucket
 
-.. _ckan-dev: https://groups.google.com/a/ckan.org/forum/#!forum/ckan-dev
-.. _#ckan: http://webchat.freenode.net/?channels=ckan
-.. _CKAN Wiki: https://github.com/ckan/ckan/wiki
-.. _CKAN chat on Gitter: https://gitter.im/ckan/chat
+    # Defines how long a signed URL is valid (default 1 hour).
+    ckanext.s3filestore.signed_url_expiry = 3600
+
+    # Don't check for access on each startup
+    ckanext.s3filestore.check_access_on_startup = false
 
 
-Copying and License
--------------------
+-----------------
+CLI
+-----------------
 
-This material is copyright (c) 2006-2018 Open Knowledge Foundation and contributors.
+To upload all local resources located in `ckan.storage_path` location dir to the configured S3 bucket use::
 
-It is open and licensed under the GNU Affero General Public License (AGPL) v3.0
-whose full text may be found at:
+    ckan -c /etc/ckan/default/ckan.ini s3-upload
 
-http://www.fsf.org/licensing/licenses/agpl-3.0.html
+
+------------------------
+Development Installation
+------------------------
+
+To install ckanext-s3filestore for development, activate your CKAN virtualenv and
+do::
+
+    git clone https://github.com/okfn/ckanext-s3filestore.git
+    cd ckanext-s3filestore
+    python setup.py develop
+    pip install -r dev-requirements.txt
+    pip install -r requirements.txt
+
+
+-----------------
+Running the Tests
+-----------------
+
+To run the tests, do::
+
+    nosetests --ckan --nologcapture --with-pylons=test.ini
+
+To run the tests and produce a coverage report, first make sure you have
+coverage installed in your virtualenv (``pip install coverage``) then run::
+
+    nosetests --ckan --nologcapture --with-pylons=test.ini --with-coverage --cover-package=ckanext.s3filestore --cover-inclusive --cover-erase --cover-tests
+
+
+---------------------------------------
+Registering ckanext-s3filestore on PyPI
+---------------------------------------
+
+ckanext-s3filestore should be available on PyPI as
+https://pypi.python.org/pypi/ckanext-s3filestore. If that link doesn't work, then
+you can register the project on PyPI for the first time by following these
+steps:
+
+1. Create a source distribution of the project::
+
+     python setup.py sdist
+
+2. Register the project::
+
+     python setup.py register
+
+3. Upload the source distribution to PyPI::
+
+     python setup.py sdist upload
+
+4. Tag the first release of the project on GitHub with the version number from
+   the ``setup.py`` file. For example if the version number in ``setup.py`` is
+   0.0.1 then do::
+
+       git tag 0.0.1
+       git push --tags
+
+
+----------------------------------------------
+Releasing a New Version of ckanext-s3filestore
+----------------------------------------------
+
+ckanext-s3filestore is available on PyPI as https://pypi.python.org/pypi/ckanext-s3filestore.
+To publish a new version to PyPI follow these steps:
+
+1. Update the version number in the ``setup.py`` file.
+   See `PEP 440 <http://legacy.python.org/dev/peps/pep-0440/#public-version-identifiers>`_
+   for how to choose version numbers.
+
+2. Create a source distribution of the new version::
+
+     python setup.py sdist
+
+3. Upload the source distribution to PyPI::
+
+     python setup.py sdist upload
+
+4. Tag the new release of the project on GitHub with the version number from
+   the ``setup.py`` file. For example if the version number in ``setup.py`` is
+   0.0.2 then do::
+
+       git tag 0.0.2
+       git push --tags
