@@ -6,6 +6,7 @@ ckan.module("s3filestore-multipart-upload", function($, _) {
             cloud: "S3",
             filePartMaxSize: 0,
             fileMaxSize: 0,
+            sessionTimeoutMs: 0,
             i18n: {
                 resource_create: _("Resource has been created."),
                 resource_update: _("Resource has been updated."),
@@ -188,13 +189,13 @@ ckan.module("s3filestore-multipart-upload", function($, _) {
                         for (let i = 0; i < blobs.length; i++) {
                             blob = blobs[i];
                             self._fileParts.push({'url': data.result.signed_urls[i],
-                                           'name': file.name,
-                                           'uploadId': data.result.id,
-                                           'id': id,
-                                           'data': blob,
-                                           'partNumber': i+1,
-                                           'S3uploadId': data.result.upload_id,
-                                           'originalFileSize': originalFileSize});
+                                'name': file.name,
+                                'uploadId': data.result.id,
+                                'id': id,
+                                'data': blob,
+                                'partNumber': i+1,
+                                'S3uploadId': data.result.upload_id,
+                                'originalFileSize': originalFileSize});
                         }
                         self._onSendAllFileParts();
                     },
@@ -203,6 +204,18 @@ ckan.module("s3filestore-multipart-upload", function($, _) {
                         self._onHandleError("Unable to initiate multipart upload");
                     }
                 );
+        },
+
+        _onKeepAlive: function() {
+            return $.ajax({
+                method: "POST",
+                url: this.sandbox.client.url(
+                    "/api/action/s3filestore_keep_alive_multipart"
+                ),
+                data: JSON.stringify({
+                    name: 'keep-alive'
+                })
+            });
         },
 
         _onSendAllFileParts: function(){
@@ -222,6 +235,7 @@ ckan.module("s3filestore-multipart-upload", function($, _) {
                             self._setProgress(progress, self._bar);
                         });
                         this._bar.attr("listener", "true");
+                        setInterval(function() {self._onKeepAlive();}, parseInt(self.options.sessionTimeoutMs) - 60000);
                     }
                     request.open('PUT', fileParts[i]['url'], true);
                     // Apply this header only if the file is not a chunked upload.
@@ -266,7 +280,7 @@ ckan.module("s3filestore-multipart-upload", function($, _) {
 
                     }
                     request.onerror = function() {
-                       self._onHandleError("Error uploading file.")
+                        self._onHandleError("Error uploading file.")
                     }
                 }
             }

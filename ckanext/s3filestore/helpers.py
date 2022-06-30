@@ -11,3 +11,8 @@ def max_file_upload_size():
 # AWS supports upto 5GB in a single PUT and this value should not be greater.
 def max_file_part_size():
     return tk.config.get("ckanext.s3filestore.max_file_part_size_in_bytes", 4294967296)
+
+
+# CKAN Session Timeout Value
+def ckan_session_timeout_ms():
+    return tk.config.get("ckanext.s3filestore.ckan_session_timeout_in_ms", 900000)

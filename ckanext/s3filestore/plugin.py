@@ -34,6 +34,8 @@ class S3FileStorePlugin(plugins.SingletonPlugin):
         return dict(
             s3filestore_max_file_upload_size_in_bytes=helpers.max_file_upload_size,
             s3filestore_max_file_part_size_in_bytes=helpers.max_file_part_size,
+            s3filestore_ckan_session_timeout_ms=helpers.ckan_session_timeout_ms,
+
         )
 
     # IConfigurable

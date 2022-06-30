@@ -58,11 +58,11 @@ def initiate_multipart(context, data_dict):
     if chunk_count > 1:
         part_count = 1
         while chunk_count >= 1:
-            presigned_urls\
+            presigned_urls \
                 .append(uploader.create_multipart_upload_part(key=key,
                                                               part_number=part_count,
                                                               upload_id=upload_id)
-                .get('url', None))
+                        .get('url', None))
             part_count += 1
             chunk_count -= 1
     else:
@@ -122,3 +122,6 @@ def finish_multipart(context, data_dict):
 
     return {"commited": True}
 
+
+def keep_alive_multipart(context, data_dict):
+    return {"keep_alive": True}

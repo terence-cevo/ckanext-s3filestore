@@ -1,6 +1,6 @@
 .. You should enable this project on travis-ci.org and coveralls.io to make
-   these badges work. The necessary Travis and Coverage config files have been
-   generated for you.
+these badges work. The necessary Travis and Coverage config files have been
+generated for you.
 
 .. image:: https://github.com/keitaroinc/ckanext-s3filestore/workflows/CI/badge.svg
     :target: https://github.com/keitaroinc/ckanext-s3filestore/actions
@@ -41,6 +41,19 @@ As chunked files are to be stitched together using the (finish_multipart) CKAN a
 
 Server session timeout is to be considered as a factor to decide upper thresholds for file size and chunk size
 
+------------
+Keep Connection to Server Alive:
+------------
+
+This setting will be used to keep a connection to the server alive, when uploading larger files.
+
+Default value is set to 15 minutes (900000ms)
+And should not be set lower than 1 minute (60000)
+
+
+Config Param::
+
+    ckanext.s3filestore.ckan_session_timeout_in_ms=90000
 
 ------------
 Requirements
@@ -55,8 +68,8 @@ Installation
 ------------
 
 .. Add any additional install steps to the list below.
-   For example installing any non-Python dependencies or adding any required
-   config settings.
+For example installing any non-Python dependencies or adding any required
+config settings.
 
 To install ckanext-s3filestore:
 
